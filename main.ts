@@ -12,7 +12,6 @@ const H = 1024;
 const OUT_DIR = process.env.MAKEFUN_OUTPUT_DIR ?? '/output';
 const OUT_FILE = join(OUT_DIR, 'entry.png');
 
-// ---------------- scalar helpers ----------------
 const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : v);
 const clamp = (v: number, a: number, b: number): number => (v < a ? a : v > b ? b : v);
 const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
@@ -21,7 +20,6 @@ const sstep = (e0: number, e1: number, x: number): number => {
   return t * t * (3 - 2 * t);
 };
 
-// ---------------- deterministic hash / noise ----------------
 const ihash = (x: number, y: number): number => {
   let h = Math.imul(x | 0, 0x27d4eb2d) ^ Math.imul(y | 0, 0x165667b1);
   h = Math.imul(h ^ (h >>> 15), 0x2545f491);
@@ -57,7 +55,6 @@ const fbm = (x: number, y: number, oct: number): number => {
   return s / norm;
 };
 
-// ---------------- palette ----------------
 const SKY_TOP = [4, 9, 18];
 const SKY_MID = [10, 40, 62];
 const SKY_LOW = [34, 108, 130];
@@ -69,14 +66,12 @@ const WATER_MID = [30, 176, 200];
 const WATER_BRIGHT = [176, 250, 250];
 const FOAM = [245, 255, 255];
 const GOLD = [255, 198, 76];
-const GOLD_LT = [255, 236, 176];
 const SCARLET = [238, 62, 46];
 const SCARLET_DK = [156, 28, 22];
 const SCARLET_LT = [255, 116, 82];
 const FRAG_DK = [8, 18, 30];
 const FRAG_TEAL = [52, 170, 190];
 
-// ---------------- geometry ----------------
 const HY = 0.720;              // horizon
 const AA = 1.4 / W;            // one anti-alias step
 const CX = 0.500;              // ring centre x
@@ -137,7 +132,6 @@ const FRAGS: Frag[] = [
   { x: 0.130, y: 0.470, w: 0.050, h: 0.082, ang: 0.30, front: true },
 ];
 
-// ---------------- scene pieces ----------------
 function ringGlowAt(px: number, py: number): number {
   const dx = (px - CX) / RX;
   const dy = (py - CY) / RY;
@@ -175,7 +169,6 @@ function voronoiEdge(px: number, py: number, cell: number): number {
   return Math.sqrt(d2) - Math.sqrt(d1);
 }
 
-// ---------------- render ----------------
 function render(): Buffer {
   const rgb = Buffer.allocUnsafe(W * H * 3);
   let o = 0;
@@ -184,7 +177,6 @@ function render(): Buffer {
     for (let x = 0; x < W; x++) {
       const px = (x + 0.5) / W;
 
-      // ---- sky ----
       const tv = clamp01(py / HY);
       let r = lerp(SKY_TOP[0], SKY_MID[0], sstep(0, 0.6, tv));
       let g = lerp(SKY_TOP[1], SKY_MID[1], sstep(0, 0.6, tv));
@@ -217,7 +209,6 @@ function render(): Buffer {
         b += sa * 255;
       }
 
-      // ---- ring backdrop glow ----
       const rdx = (px - CX) / RX;
       const rdy = (py - CY) / RY;
       const rr = Math.hypot(rdx, rdy);
@@ -229,7 +220,6 @@ function render(): Buffer {
       g += gl * 180;
       b += gl * 190;
 
-      // ---- back fragments ----
       for (let i = 0; i < FRAGS.length; i++) {
         const f = FRAGS[i];
         if (f.front) continue;
@@ -269,7 +259,6 @@ function render(): Buffer {
         b = lerp(b, cb, cov);
       }
 
-      // ---- ring solid ----
       let cov = 1 - sstep(TUBE - AA, TUBE, ad);
       const th = Math.atan2(rdy, rdx);
       let dth = Math.abs(th - Math.PI * 0.5);
@@ -309,7 +298,6 @@ function render(): Buffer {
         b = lerp(b, cb, cov);
       }
 
-      // ---- energy arcs orbiting the ring ----
       for (let ai = 0; ai < 2; ai++) {
         const arx = ai === 0 ? RX * 1.26 : RX * 1.48;
         const ary = ai === 0 ? RY * 1.26 : RY * 1.48;
@@ -329,7 +317,6 @@ function render(): Buffer {
         }
       }
 
-      // ---- rising coil ----
       if (px > coilMinX && px < coilMaxX && py > coilMinY && py < coilMaxY) {
         let bd = 1e9;
         let bi = 0;
@@ -396,7 +383,6 @@ function render(): Buffer {
         }
       }
 
-      // ---- front fragments ----
       for (let i = 0; i < FRAGS.length; i++) {
         const f = FRAGS[i];
         if (!f.front) continue;
@@ -436,7 +422,6 @@ function render(): Buffer {
         b = lerp(b, cb, cov);
       }
 
-      // ---- salt flat ----
       const ga = sstep(HY - AA, HY + AA, py);
       if (ga > 0.002) {
         const ft = sstep(HY, 1.0, py);
@@ -473,7 +458,6 @@ function render(): Buffer {
         b = lerp(b, fb, ga);
       }
 
-      // ---- light beam from the open door up to the ring ----
       {
         const ax = 0.470;
         const ay = 0.700;
@@ -497,7 +481,6 @@ function render(): Buffer {
         b += beam * (218 - warm * 158);
       }
 
-      // ---- embers rising from the portal ----
       if (px > 0.39 && px < 0.64 && py > 0.36 && py < 0.83) {
         for (let e = 0; e < 30; e++) {
           const r1 = ihash(e * 13 + 3, 91);
@@ -519,7 +502,6 @@ function render(): Buffer {
         }
       }
 
-      // ---- scarlet elevator ----
       {
         const ex = 0.470;
         const eby = 0.800;
@@ -607,13 +589,11 @@ function render(): Buffer {
         b += bea * 150;
       }
 
-      // ---- watcher ----
       {
         const wx = 0.545;
         const wy = 0.802;
         const hh = 0.030;
         const dx = px - wx;
-        const dy = py - wy;
         let cov = 0;
         const hdx = dx / 0.0055;
         const hdy = (py - (wy - hh)) / 0.0055;
@@ -652,7 +632,6 @@ function render(): Buffer {
   return rgb;
 }
 
-// ---------------- PNG encoding ----------------
 const CRC_TABLE = ((): Uint32Array => {
   const t = new Uint32Array(256);
   for (let n = 0; n < 256; n++) {
@@ -736,7 +715,6 @@ function encodePNG(width: number, height: number, rgb: Buffer): Buffer {
   return Buffer.concat([sig, chunk('IHDR', ihdr), chunk('IDAT', idat), chunk('IEND', Buffer.alloc(0))]);
 }
 
-// ---------------- main ----------------
 const pixels = render();
 const png = encodePNG(W, H, pixels);
 mkdirSync(OUT_DIR, { recursive: true });
